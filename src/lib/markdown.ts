@@ -1,8 +1,4 @@
-/**
- * Markdown → sanitized HTML rendering for the reader.
- * Uses `marked` (GFM) for parsing and `sanitize-html` for sanitization,
- * so it is safe to run on both server and client.
- */
+// Markdown → sanitized HTML. Safe to run on server and client.
 import { marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 
@@ -33,7 +29,7 @@ function escapeAttr(s: string): string {
 	return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-// Handles both the modern token-object signature and legacy positional args.
+// Supports both marked token-object and legacy positional renderer args.
 function imageRenderer(...args: any[]): string {
 	const first = args[0];
 	const href = typeof first === 'object' && first ? (first.href as string) : (first as string);
@@ -44,7 +40,7 @@ function imageRenderer(...args: any[]): string {
 	if (id) {
 		return `<div class="embed-youtube"><iframe src="https://www.youtube.com/embed/${escapeAttr(
 			id
-		)}" title="${escapeAttr(title || text || 'YouTube video')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen frameborder="0"></iframe></div>`;
+		)}" title="${escapeAttr(title || text || 'YouTube video')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen frameborder="0" loading="lazy"></iframe></div>`;
 	}
 
 	const titleAttr = title ? ` title="${escapeAttr(title)}"` : '';
@@ -76,7 +72,7 @@ export function renderMarkdown(md: string): string {
 			span: ['class']
 		},
 		allowedIframeHostnames: ['www.youtube.com', 'www.youtube-nocookie.com'],
-		// allow relative hrefs/images to be proxied by the client reader
+
 		transformTags: {}
 	});
 }

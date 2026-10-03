@@ -1,11 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 
-// Simple proxy for images (and other resources) used by the reader.
-// Safety/limits:
-// - only allow http(s) schemes
-// - impose a max content-length to avoid huge downloads
-// - do not allow local network addresses (basic check)
+// Reader asset proxy. SSRF guard: http(s) only, size-capped, no local hosts.
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -34,7 +30,7 @@ export const GET: RequestHandler = async (event) => {
 			return json({ error: 'Refusing to proxy local addresses' }, { status: 403 });
 		}
 
-		// Fetch remote resource server-side so we avoid CORS/referrer issues in the client
+
 		const res = await fetch(url.toString(), {
 			method: 'GET',
 			redirect: 'follow',
@@ -58,7 +54,7 @@ export const GET: RequestHandler = async (event) => {
 			}
 		}
 
-		// Stream the response body back to the client to avoid buffering large files
+
 		return new Response(res.body, {
 			status: res.status,
 			headers: {

@@ -60,11 +60,7 @@ function buildItemXml(link: {
     </item>`;
 }
 
-/**
- * GET /api/feed
- * RSS 2.0 feed of the latest links, newest first.
- * Supports `mode` (`latest`, `top`) and `limit` (max 200).
- */
+// GET /api/feed: RSS 2.0 feed, newest first (`mode`, `limit` ≤ 200).
 export const GET: RequestHandler = async (event) => {
 	try {
 		await initDb();

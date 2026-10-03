@@ -20,9 +20,7 @@
 
 	let debounceTimer: number | undefined;
 
-	// Cache the full link list for the lifetime of an open palette session so
-	// repeated keystrokes filter in-memory instead of re-fetching (AGENTS.md:
-	// never hit `?limit=10000` on every keystroke).
+	// One fetch per open session; keystrokes filter in memory.
 	let allLinksCache: Result[] | null = null;
 
 	async function getAllLinks(): Promise<Result[]> {
@@ -139,15 +137,30 @@
 </script>
 
 {#if isOpen}
-	<div class="cmd-overlay" role="presentation" onclick={() => (isOpen = false)}>
-		<div class="cmd-modal" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+	<div
+		class="cmd-overlay"
+		role="presentation"
+		onclick={() => (isOpen = false)}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') isOpen = false;
+		}}
+	>
+		<div class="cmd-modal" role="dialog" aria-modal="true" aria-label="Search articles" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 			<div class="command-palette-header">
 				<input
 					bind:this={inputEl}
 					bind:value={search}
 					type="text"
+					role="combobox"
+					aria-expanded={results.length > 0}
+					aria-controls="cmd-results-list"
+					aria-label="Search articles"
+					aria-activedescendant={results[selectedIndex]?.id
+						? `cmd-option-${results[selectedIndex].id}`
+						: undefined}
 					placeholder="Search articles... (Press ESC to close)"
 					onkeydown={handleKeyDown}
+					oninput={() => {}}
 					class="cmd-input"
 				/>
 			</div>
@@ -159,14 +172,18 @@
 			{:else if results.length === 0}
 				<div class="cmd-results"><div class="cmd-status">Start typing to search articles</div></div>
 			{:else}
-				<div class="cmd-results">
+				<div class="cmd-results" id="cmd-results-list" role="listbox">
 					{#each results as result, idx (result.id)}
 						{@const title = result.title || result.meta?.title || 'Untitled'}
 						{@const domain = result.domain || result.meta?.domain || 'unknown'}
 						<button
 							type="button"
+							role="option"
+							id={`cmd-option-${result.id}`}
+							aria-selected={idx === selectedIndex}
 							class="cmd-item {idx === selectedIndex ? 'selected' : ''}"
 							onclick={() => handleSelect(result)}
+							onmouseenter={() => (selectedIndex = idx)}
 						>
 							<div class="cmd-item-title">{title}</div>
 							<div class="cmd-item-meta">

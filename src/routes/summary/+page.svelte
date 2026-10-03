@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import Header from '$lib/components/Header.svelte';
 
 	type SummaryItem = {
 		id?: string;
@@ -231,6 +232,13 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Summary – linkstash</title>
+</svelte:head>
+
+<Header />
+
+<main class="app-main" id="main-content">
 <div class="summary">
 	<h1>Summary</h1>
 	<p class="subtitle">{formatRange(data?.from || from || null, data?.to || to || null)}</p>
@@ -340,7 +348,7 @@
 								<div class="link-meta">
 									<span class="link-domain">{domain}</span>
 									<span class="link-room">{roomName(item)}</span>
-									<span class="link-votes">{item.count ? `${item.count} votes` : ''}</span>
+									{#if item.count}<span class="link-votes">{item.count} votes</span>{/if}
 								</div>
 							</div>
 						</div>
@@ -354,3 +362,4 @@
 		<a href="/" class="summary-back-link">Back to feed</a>
 	</p>
 </div>
+</main>

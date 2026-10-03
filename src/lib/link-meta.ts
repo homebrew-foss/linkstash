@@ -1,11 +1,4 @@
-/**
- * Typed accessors for link display fields.
- *
- * Link meta (title, url, domain, image, roomComment, ...) arrives flattened onto
- * the Link object from the API, but can also live inside the `meta` blob (e.g.
- * server-rendered pages). These helpers centralize the fallbacks and the
- * `meta` casts so components never need `(link as any)`.
- */
+// Field accessors with fallbacks for flattened or `meta`-nested link data.
 
 import type { Link } from './types';
 
@@ -33,10 +26,6 @@ export function getLinkDomain(link: Link): string {
 	} catch {
 		return '';
 	}
-}
-
-export function getLinkImage(link: Link): string {
-	return metaString(link, 'image') || '';
 }
 
 export function getRoomComment(link: Link): string {

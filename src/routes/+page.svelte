@@ -5,6 +5,6 @@
 	let { data }: PageProps = $props();
 </script>
 
-<main class="app-main">
+<main class="app-main" id="main-content">
 	<LinksClient initialPage={data.page} />
 </main>

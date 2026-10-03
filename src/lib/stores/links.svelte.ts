@@ -11,13 +11,7 @@ export interface PaginatedLinksInitial {
 	hasMore: boolean;
 }
 
-/**
- * Paginated links loading with infinite scroll + localStorage caching.
- * Re-fetches from page 0 whenever the rank `mode` changes.
- *
- * When `initial` is provided (server-rendered seed), the first page is not
- * re-fetched on mount; only later mode changes trigger a client fetch.
- */
+// Paginated links with infinite scroll + cache. A server `initial` page skips the first fetch.
 export function createPaginatedLinks(
 	getMode: () => RankMode,
 	initial?: PaginatedLinksInitial
@@ -26,7 +20,6 @@ export function createPaginatedLinks(
 
 	let links = $state<Link[] | null>(initial ? initial.items : null);
 	let isLoading = $state(initial ? false : true);
-	let isRefreshed = $state(false);
 	let hasMore = $state(initial ? initial.hasMore : true);
 	let offset = $state(initial ? initial.items.length : 0);
 	let allLinksCount = $state(initial ? initial.total : 0);
@@ -53,18 +46,11 @@ export function createPaginatedLinks(
 			}
 
 			const data = await response.json();
-			const sorted = sortLinksByMode(data.items || [], mode).map((item, index) => ({
-				...item,
-				displayIndex: pageOffset + index + 1
-			}));
+			const sorted = sortLinksByMode(data.items || [], mode);
 
 			if (pageOffset === 0) {
 				links = sorted;
 				setToLocalStorage(getLinksCacheKey(mode), sorted);
-				isRefreshed = true;
-				setTimeout(() => {
-					isRefreshed = false;
-				}, 1800);
 			} else {
 				links = [...(links ?? []), ...sorted];
 			}
@@ -81,10 +67,9 @@ export function createPaginatedLinks(
 	}
 
 	$effect(() => {
-		// track mode so this re-runs when the rank mode changes
+
 		void mode;
-		// On the first client run after SSR seeding, keep the server-rendered
-		// page instead of re-fetching page 0.
+		// First client run keeps the SSR seed instead of re-fetching.
 		if (isSeeded) {
 			isSeeded = false;
 			return;
@@ -109,9 +94,6 @@ export function createPaginatedLinks(
 		},
 		get isLoading() {
 			return isLoading;
-		},
-		get isRefreshed() {
-			return isRefreshed;
 		},
 		get hasMore() {
 			return hasMore;

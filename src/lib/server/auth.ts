@@ -1,8 +1,6 @@
 import { env } from '$env/dynamic/private';
 
-/**
- * Constant-time-ish compare to avoid leaking the key via timing.
- */
+// Constant-time-ish compare to avoid leaking the key via timing.
 function safeEqual(a: string, b: string): boolean {
 	if (a.length !== b.length) return false;
 	let diff = 0;
@@ -12,10 +10,7 @@ function safeEqual(a: string, b: string): boolean {
 	return diff === 0;
 }
 
-/**
- * Verify the `Authorization: Bearer <AUTH_KEY>` header.
- * Fails closed when AUTH_KEY is unset (empty key matches nothing).
- */
+// Verify `Authorization: Bearer <AUTH_KEY>`. Fails closed when unset.
 export function isAuthorized(authorization: string | null): boolean {
 	const key = env.AUTH_KEY;
 	if (!key) return false;

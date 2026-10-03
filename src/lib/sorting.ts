@@ -1,17 +1,9 @@
-/**
- * Centralized sorting logic for links across the application
- * Used by both client and server
- */
-
 import type { Link, RankMode } from './types';
 
 const RISING_SCORE_MULTIPLIER = 1.25;
 const RISING_SCORE_MIN_VOTES = 0;
 
-/**
- * Calculate rising score based on votes and time
- * Uses a logarithmic decay function
- */
+// Log-decayed score from votes and age.
 function calculateRisingScore(link: Link, currentTime: number): number {
 	const votes = Math.max(RISING_SCORE_MIN_VOTES, Number(link.count || 0));
 	const timestamp = Number(link.ts || 0);
@@ -24,9 +16,6 @@ function calculateRisingScore(link: Link, currentTime: number): number {
 	return Math.log2(votes + 1) / Math.pow(ageHours + 2, RISING_SCORE_MULTIPLIER);
 }
 
-/**
- * Normalize a link with a score based on the ranking mode
- */
 export function scoreLink(link: Link, mode: RankMode, currentTime: number = Date.now()): Link {
 	switch (mode) {
 		case 'top':
@@ -42,10 +31,7 @@ export function scoreLink(link: Link, mode: RankMode, currentTime: number = Date
 	}
 }
 
-/**
- * Sort links by the specified ranking mode
- * Creates a new sorted array without mutating the original
- */
+// Returns a new sorted array without mutating the input.
 export function sortLinksByMode(links: Link[], mode: RankMode): Link[] {
 	const currentTime = Date.now();
 	const scored = links.map((link) => scoreLink(link, mode, currentTime));
@@ -64,9 +50,6 @@ export function sortLinksByMode(links: Link[], mode: RankMode): Link[] {
 	});
 }
 
-/**
- * Validate and normalize rank mode string
- */
 export function normalizeRankMode(raw: string | null): RankMode {
 	if (raw === 'top' || raw === 'rising') return raw;
 	return 'latest';

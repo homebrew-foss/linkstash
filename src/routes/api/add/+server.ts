@@ -126,10 +126,7 @@ export const POST: RequestHandler = async (event) => {
 	const roomComment = room ? room.comment || (room as any).room_comment : undefined;
 
 	try {
-		// if an old-style LAVA_URL is configured we'll still send to that service
-		// for backwards compatibility; otherwise use the new `defuddle.md` public
-		// converter which simply returns the page as Markdown with YAML
-		// frontmatter when you append the target URL to the path.
+		// Legacy LAVA_URL still works; default is the defuddle.md converter.
 		const parseLink = async (linkUrl: string) => {
 			if (env.LAVA_URL) {
 				// old behaviour: forward to lava
@@ -249,7 +246,7 @@ export const POST: RequestHandler = async (event) => {
 			}
 			const now = Date.now();
 			if (existingMap[nurl]) {
-				// Increment votes, but ignore rapid repeat votes from the same voter fingerprint.
+				// Cooldown-guarded vote increment per voter fingerprint.
 				const entry = existingMap[nurl];
 				const cooldownMs = getVoteCooldownMs();
 				const voterFingerprint = createVoterFingerprint(submitter, roomId);
@@ -426,7 +423,7 @@ export const POST: RequestHandler = async (event) => {
 					if (!meta.url) meta.url = item.url;
 				} catch (e) {}
 
-				// Upsert into link_index for fast metadata lookups (no `url` column)
+
 				try {
 					const domain = (function () {
 						try {

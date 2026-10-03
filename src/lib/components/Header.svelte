@@ -1,58 +1,41 @@
 <script lang="ts">
-	import { ExternalLink, Settings, Sparkles } from 'lucide-svelte';
 	import posthog from 'posthog-js';
 	import type { Snippet } from 'svelte';
 
 	interface Props {
-		suggestionsExpanded?: boolean;
-		onToggleSuggestions?: () => void;
 		children?: Snippet;
 	}
 
-	let {
-		suggestionsExpanded = false,
-		onToggleSuggestions,
-		children
-	}: Props = $props();
+	let { children }: Props = $props();
 </script>
 
+<a class="skip-link" href="#main-content">Skip to content</a>
 <header class="header">
-	<div class="container header-row">
+	<div class="header-row">
+		<a href="/" class="header-logo" aria-label="linkstash home">L</a>
 		<a href="/" class="site-title">linkstash</a>
+		<nav class="header-nav" aria-label="Primary">
+			<a href="/">new</a>
+			<span class="nav-sep" aria-hidden="true">|</span>
+			<a href="/summary">past</a>
+			<span class="nav-sep" aria-hidden="true">|</span>
+			<a
+				href="/api/feed"
+				onclick={() => posthog.capture('rss_feed_clicked')}
+			>feed</a>
+		</nav>
 		{#if children}
 			<div class="header-context">{@render children()}</div>
 		{/if}
 		<div class="header-actions">
-			{#if onToggleSuggestions}
-				<button
-					type="button"
-					class="icon-btn"
-					title={suggestionsExpanded ? 'Hide suggestions' : 'Show suggestions'}
-					aria-label={suggestionsExpanded ? 'Hide suggestions' : 'Show suggestions'}
-					onclick={onToggleSuggestions}
-					aria-pressed={suggestionsExpanded}
-				>
-					<Sparkles size={14} />
-				</button>
-			{/if}
-
 			<a
-				href="/settings"
-				class="icon-btn"
-				aria-label="Settings"
-			>
-				<Settings size={14} />
-			</a>
-
-			<a
-				href="https://github.com/homebrew-ec-foss/linkstash"
-				class="icon-btn"
+				href="https://github.com/homebrew-foss/linkstash"
 				target="_blank"
 				rel="noopener noreferrer"
 				aria-label="GitHub repository"
 				onclick={() => posthog.capture('github_link_clicked')}
 			>
-				<ExternalLink size={14} />
+				github
 			</a>
 		</div>
 	</div>

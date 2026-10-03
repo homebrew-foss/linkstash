@@ -2,11 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { getClient, initDb, sanitizeLink } from '$lib/server/db';
 
-/**
- * GET /api/summary
- * Summarize links in a date range, optionally filtered by room.
- * Query params: `day` (single day, legacy), `from`/`to` (YYYY-MM-DD), `room`.
- */
+// GET /api/summary: links in a date range, optionally filtered by room.
 export const GET: RequestHandler = async (event) => {
 	try {
 		await initDb();
@@ -66,7 +62,7 @@ export const GET: RequestHandler = async (event) => {
 			return json({ error: '`from` cannot be later than `to`' }, { status: 400 });
 		}
 
-		// Calculate start and end timestamps for the date range (UTC, inclusive of toDay).
+
 		const startTs = new Date(fromDay + 'T00:00:00Z').getTime();
 		const endTs = new Date(toDay + 'T00:00:00Z').getTime() + 86400000; // next day start
 

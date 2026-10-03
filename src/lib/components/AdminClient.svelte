@@ -96,7 +96,7 @@
 	<p>Delete links (authenticate with your <code>AUTH_KEY</code>).</p>
 
 	<div class="admin-form">
-		<input class="admin-input" bind:value={authKey} placeholder="AUTH_KEY" aria-label="AUTH_KEY" />
+		<input class="admin-input" type="password" bind:value={authKey} placeholder="AUTH_KEY" aria-label="AUTH_KEY" autocomplete="off" />
 		<button class="admin-btn" onclick={saveAuth}>Save</button>
 		<button class="admin-btn" onclick={() => { authKey = ''; window.localStorage.removeItem('admin_auth'); }}>Clear</button>
 		<input class="admin-input" placeholder="Search title, url, or id" bind:value={search} />
@@ -108,7 +108,10 @@
 
 	{#if loading}
 		<div class="loading">Loading links…</div>
+	{:else if filtered.length === 0}
+		<div class="empty">No links match this filter.</div>
 	{:else}
+		<div class="admin-table-wrap">
 		<table class="admin-table">
 			<thead>
 				<tr>
@@ -137,6 +140,7 @@
 				{/each}
 			</tbody>
 		</table>
+		</div>
 	{/if}
 
 	<div class="admin-footer">

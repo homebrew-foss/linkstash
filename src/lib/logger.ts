@@ -1,7 +1,3 @@
-/**
- * Simple logger utility for consistent error/info logging
- */
-
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 type LogFn = (message: string, error?: unknown) => void;

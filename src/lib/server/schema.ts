@@ -37,10 +37,7 @@ export const SCHEMA_DDL: string[] = [
 
 export const EMBEDDING_DIM = 128;
 
-/**
- * Vector index creation can fail on older engines; the reader API has a
- * safe fallback path, so this is best-effort.
- */
+// Best-effort: older engines may reject the vector index; the API falls back to scan.
 export async function ensureVectorIndex(client: any): Promise<void> {
 	try {
 		await client.execute(`
@@ -52,10 +49,7 @@ export async function ensureVectorIndex(client: any): Promise<void> {
 	}
 }
 
-/**
- * Migrate old link_index (if it had a `url` column) into the new schema by
- * moving url into meta.url (if not already present).
- */
+// Migrate legacy link_index rows: move `url` into meta.url.
 export async function migrateLinkIndex(client: any): Promise<void> {
 	try {
 		const cols = await client.execute({ sql: "PRAGMA table_info('link_index')", args: [] });

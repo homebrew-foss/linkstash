@@ -142,10 +142,7 @@ function toSuggestion(row: any) {
 	};
 }
 
-/**
- * GET /api/related/[key]
- * Semantic recommendations for the given link, plus group counts.
- */
+// GET /api/related/[key]: semantic recommendations plus group counts.
 export const GET: RequestHandler = async (event) => {
 	const { key } = event.params;
 	if (!key) {

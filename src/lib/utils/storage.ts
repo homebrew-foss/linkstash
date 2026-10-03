@@ -1,13 +1,6 @@
-/**
- * Utilities for safe localStorage operations with error handling
- */
-
 import { logger } from '$lib/logger';
 import { LINKS_CACHE_PREFIX } from '$lib/constants';
 
-/**
- * Safely get item from localStorage
- */
 export function getFromLocalStorage<T>(key: string): T | null {
 	try {
 		if (typeof window === 'undefined') {
@@ -22,9 +15,6 @@ export function getFromLocalStorage<T>(key: string): T | null {
 	}
 }
 
-/**
- * Safely set item in localStorage
- */
 export function setToLocalStorage<T>(key: string, value: T): boolean {
 	try {
 		if (typeof window === 'undefined') {
@@ -38,9 +28,6 @@ export function setToLocalStorage<T>(key: string, value: T): boolean {
 	}
 }
 
-/**
- * Safely remove item from localStorage
- */
 export function removeFromLocalStorage(key: string): boolean {
 	try {
 		if (typeof window === 'undefined') {
@@ -54,9 +41,6 @@ export function removeFromLocalStorage(key: string): boolean {
 	}
 }
 
-/**
- * Get cache key for links by ranking mode
- */
 export function getLinksCacheKey(mode: string): string {
 	return `${LINKS_CACHE_PREFIX}_${mode}`;
 }

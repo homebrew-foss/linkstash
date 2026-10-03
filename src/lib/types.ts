@@ -1,7 +1,3 @@
-/**
- * Core type definitions for the linkstash application
- */
-
 export type RankMode = 'latest' | 'top' | 'rising';
 
 export interface Link {
@@ -13,7 +9,6 @@ export interface Link {
 	ts: number;
 	count: number;
 	score?: number;
-	displayIndex?: number;
 	meta?: Record<string, unknown>;
 	submittedBy?: string;
 }
@@ -32,10 +27,4 @@ export interface RelatedLink {
 export interface RelatedGroup {
 	name: string;
 	count: number;
-}
-
-export interface DateGroup {
-	key: string;
-	label: string;
-	items: Link[];
 }

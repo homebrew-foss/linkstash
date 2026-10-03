@@ -8,16 +8,7 @@ import type { Link, RankMode } from '$lib/types';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
-/**
- * GET /api/links
- * Fetch links with optional sorting mode and pagination
- *
- * Query Parameters:
- *   - url: optional URL to fetch a specific link
- *   - mode: ranking mode ('latest', 'top', 'rising') - defaults to 'latest'
- *   - offset: pagination offset (default: 0)
- *   - limit: items per page (default: 50, max: 200, or unlimited if >= 10000 for search)
- */
+// GET /api/links: `url` lookup, `mode` ranking, paginated (`limit` ≥ 10000 = search).
 export const GET: RequestHandler = async (event) => {
 	try {
 		const search = event.url.searchParams;
@@ -29,13 +20,13 @@ export const GET: RequestHandler = async (event) => {
 		const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? rawOffset : 0;
 		let limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : DEFAULT_LIMIT;
 
-		// Allow unlimited results if limit >= 10000 (for search queries)
+
 		const isSearchQuery = limit >= 10000;
 		if (!isSearchQuery) {
 			limit = Math.min(limit, MAX_LIMIT);
 		}
 
-		// Fetch specific link by URL (normalized, matching dedup behavior)
+		// Single-link lookup by normalized URL.
 		if (queryUrl) {
 			const link = await getLinkByUrl(queryUrl);
 			if (!link) {
@@ -52,7 +43,7 @@ export const GET: RequestHandler = async (event) => {
 			return sanitizeLink(l) as Link;
 		};
 
-		// For rising mode, fetch all and sort in-memory (needs full dataset for scoring)
+		// Rising needs the full dataset for scoring; sort in memory.
 		if (mode === 'rising') {
 			const fullResult = await client.execute({
 				sql: `SELECT l.id, l.url, li.domain, l.submitted_by, li.ts, l.count, COALESCE(l.meta, li.meta) AS meta
@@ -66,13 +57,8 @@ export const GET: RequestHandler = async (event) => {
 			const total = sorted.length;
 			const paged = sorted.slice(offset, offset + limit);
 
-			const withIndex = paged.map((link, idx) => ({
-				...link,
-				displayIndex: offset + idx + 1
-			}));
-
 			return json({
-				items: withIndex,
+				items: paged,
 				total,
 				offset,
 				limit,
@@ -80,7 +66,7 @@ export const GET: RequestHandler = async (event) => {
 			});
 		}
 
-		// For search queries (limit >= 10000), fetch everything and paginate in memory
+
 		if (isSearchQuery) {
 			const fullResult = await client.execute({
 				sql: `SELECT l.id, l.url, li.domain, l.submitted_by, li.ts, l.count, COALESCE(l.meta, li.meta) AS meta
@@ -91,14 +77,10 @@ export const GET: RequestHandler = async (event) => {
 			});
 
 			const links: Link[] = fullResult.rows.map(mapRow).slice(offset, offset + limit);
-			const withIndex = links.map((link, idx) => ({
-				...link,
-				displayIndex: offset + idx + 1
-			}));
 
 			const total = fullResult.rows.length;
 			return json({
-				items: withIndex,
+				items: links,
 				total,
 				offset,
 				limit,
@@ -106,7 +88,7 @@ export const GET: RequestHandler = async (event) => {
 			});
 		}
 
-		// For latest/top modes, use the shared paginated query (matches SSR output)
+
 		const page = await getPaginatedLinks({ mode: mode as 'latest' | 'top', offset, limit });
 		return json({
 			items: page.items,

@@ -5,7 +5,7 @@
 	import { renderMarkdown } from '$lib/markdown';
 	import { extractFirstHeading } from '$lib/text-utils';
 	import { getLinksCacheKey, getFromLocalStorage, setToLocalStorage } from '$lib/utils/storage';
-	import { READER_CONTENT_LOAD_TIMEOUT_MS, SETTINGS_READER_FONT_KEY } from '$lib/constants';
+	import { READER_CONTENT_LOAD_TIMEOUT_MS } from '$lib/constants';
 
 	interface SuggestedItem {
 		id: string;
@@ -17,24 +17,19 @@
 		score: number;
 	}
 
-	interface SuggestedGroup {
-		name: string;
-		count: number;
-	}
-
 	let queue = $state<string[]>([]);
 	let index = $state(0);
 	let content = $state<string | null>(null);
-	let loading = $state(false);
+	let loading = $state(true);
+	let locationReady = $state(false);
 	let error = $state<string | null>(null);
 	let metas = $state<Record<string, any>>({});
 	let isFromCache = $state(false);
 	let isOnline = $state(true);
 	let relatedItems = $state<SuggestedItem[]>([]);
-	let relatedGroups = $state<SuggestedGroup[]>([]);
-	let relatedLoading = $state(false);
 
 	let articleEl: HTMLElement | null = $state(null);
+	let readerEl: HTMLElement | null = $state(null);
 
 	let touchStartX: number | null = null;
 	let touchStartY: number | null = null;
@@ -42,9 +37,6 @@
 
 	const currentId = $derived(queue.length > 0 ? queue[index] : undefined);
 	const currentMeta = $derived(currentId ? metas[currentId] : null);
-	const readerFontClass = $derived(
-		getFromLocalStorage<string>(SETTINGS_READER_FONT_KEY) === 'serif' ? '' : 'reader-font-sans'
-	);
 
 	$effect(() => {
 		const handleOnline = () => (isOnline = true);
@@ -111,7 +103,9 @@
 			}
 		};
 
-		readLocation();
+		readLocation().finally(() => {
+			locationReady = true;
+		});
 	});
 
 	$effect(() => {
@@ -162,6 +156,8 @@
 		const id = currentId;
 		if (!id) return;
 
+		let cancelled = false;
+
 		(async () => {
 			loading = true;
 			error = null;
@@ -171,6 +167,7 @@
 				const cached = getFromLocalStorage<{ ts: number; content: string }>(
 					`reader:content:${id}`
 				);
+				if (cancelled) return;
 				if (cached && cached.content) {
 					content = cached.content;
 					isFromCache = true;
@@ -184,18 +181,23 @@
 				const timeoutId = window.setTimeout(() => {
 					timedOut = true;
 					controller.abort();
-					error = 'Timeout loading content';
-					loading = false;
+					if (!cancelled) {
+						// Keep cached content visible on timeout; only error when empty.
+						if (!content) error = 'Timeout loading content';
+						loading = false;
+					}
 				}, READER_CONTENT_LOAD_TIMEOUT_MS);
 
 				const res = await fetch(`/api/content/${id}`, { signal: controller.signal });
 				clearTimeout(timeoutId);
-				if (timedOut) return;
+				if (cancelled || timedOut) return;
 				if (!res.ok) {
-					error = `Content not found (${res.status})`;
+					// Keep cached content if the refresh fails.
+					if (!content) error = `Content not found (${res.status})`;
 					return;
 				}
 				const txt = await res.text();
+				if (cancelled) return;
 
 				content = txt;
 				isFromCache = false;
@@ -221,11 +223,16 @@
 					}
 				}
 			} catch (e) {
-				if (!((e as any)?.name === 'AbortError')) error = 'Error loading content';
+				if (cancelled) return;
+				if (!((e as any)?.name === 'AbortError') && !content) error = 'Error loading content';
 			} finally {
-				loading = false;
+				if (!cancelled) loading = false;
 			}
 		})();
+
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	function gotoNext() {
@@ -266,7 +273,8 @@
 				gotoNext();
 				e.preventDefault();
 			} else if (e.key === 'Escape') {
-				history.back();
+				if (window.history.length > 1) history.back();
+				else window.location.assign('/');
 			}
 		};
 		window.addEventListener('keydown', onKey);
@@ -297,44 +305,32 @@
 		touchStartTime = null;
 	}
 
-	function removeFromQueue(idx: number) {
-		const q = queue.filter((_, i) => i !== idx);
-		if (q.length === 0) {
-			history.back();
-			return;
-		}
-		let newIndex = index;
-		if (idx === index) {
-			if (idx < queue.length - 1) newIndex = idx;
-			else newIndex = Math.max(0, idx - 1);
-		} else if (idx < index) {
-			newIndex = Math.max(0, index - 1);
-		}
-		queue = q;
-		index = newIndex;
-	}
+	$effect(() => {
+		const el = readerEl;
+		if (!el) return;
+		el.addEventListener('touchstart', handleTouchStart, { passive: true });
+		el.addEventListener('touchend', handleTouchEnd, { passive: true });
+		return () => {
+			el.removeEventListener('touchstart', handleTouchStart);
+			el.removeEventListener('touchend', handleTouchEnd);
+		};
+	});
 
 	$effect(() => {
 		const id = currentId;
 		if (!id) {
 			relatedItems = [];
-			relatedGroups = [];
 			return;
 		}
 
 		(async () => {
-			relatedLoading = true;
 			try {
 				const res = await fetch(`/api/related/${encodeURIComponent(id)}`);
 				if (!res.ok) return;
 				const payload = await res.json();
 				relatedItems = Array.isArray(payload.related) ? payload.related : [];
-				relatedGroups = Array.isArray(payload.groups) ? payload.groups : [];
 			} catch (e) {
 				relatedItems = [];
-				relatedGroups = [];
-			} finally {
-				relatedLoading = false;
 			}
 		})();
 	});
@@ -353,7 +349,6 @@
 	});
 
 	const extracted = $derived(extractFirstHeading(content ?? undefined));
-	const pageH1 = $derived(extracted.h1 || defaultH1Text);
 	const renderedHtml = $derived(extracted.content ? renderMarkdown(extracted.content) : '');
 	const metaTitle = $derived(
 		currentMeta?.meta?.title || currentMeta?.title || extracted.h1 || ''
@@ -388,196 +383,78 @@
 	}
 </script>
 
-<div class="reader" ontouchstart={handleTouchStart} ontouchend={handleTouchEnd}>
+<div class="reader" bind:this={readerEl}>
 	<Header>
 		<div class="reader-context">
 			{#if currentMeta?.url}
-				<a class="reader-source" href={currentMeta.url} target="_blank" rel="noopener noreferrer">
+				<a href={currentMeta.url} target="_blank" rel="noopener noreferrer">
 					{getHost(currentMeta.url)}
 				</a>
 			{:else}
-				<span class="reader-title">{metaTitle || 'Reader'}</span>
+				<span>{metaTitle || 'Reader'}</span>
 			{/if}
-			{#if !isOnline || isFromCache}
-				<span class="reader-status">
-					{#if !isOnline}
-						<span class="status-badge offline">Offline</span>
-					{/if}
-					{#if isFromCache}
-						<span class="status-badge cached">Cached</span>
-					{/if}
-				</span>
-			{/if}
+			{#if !isOnline}<span> | offline</span>{/if}
+			{#if isFromCache}<span> | cached</span>{/if}
 		</div>
 	</Header>
 
-	<main class="reader-content {readerFontClass}">
-			{#if loading}
-				<div class="loading">Loading…</div>
-			{:else if error}
+	<main class="app-main" id="main-content">
+		<div class="reader-body">
+			{#if (!locationReady || loading) && !content}
+				<div class="loading" role="status">Loading...</div>
+			{:else if error && !content}
 				<div class="empty">{error}</div>
 			{:else if content}
-				<article bind:this={articleEl}>
+				<p class="reader-kicker">
+					{#if currentMeta?.url}<a
+							href={currentMeta.url}
+							target="_blank"
+							rel="noopener noreferrer">{getHost(currentMeta.url)}</a
+						> |
+					{/if}<a href="/">home</a>
+					{#if queue.length > 1}| {index + 1} of {queue.length}{/if}
+				</p>
+				<article bind:this={articleEl} class="reader-content">
 					<h1>{metaTitle || extracted.h1 || defaultH1Text}</h1>
+					{#if currentMeta?.url}
+						<p class="reader-meta-line">
+							<a href={currentMeta.url} target="_blank" rel="noopener noreferrer"
+								>{currentMeta.url}</a
+							>
+						</p>
+					{/if}
 					<div>{@html renderedHtml}</div>
 				</article>
 
-				{#if relatedItems.length > 0 || relatedGroups.length > 0}
-					<hr class="related-divider" />
+				{#if queue.length > 1}
+					<nav class="reader-nav" aria-label="Article navigation">
+						<button onclick={gotoPrev} title="Previous (←)">‹ prev</button>
+						<span aria-hidden="true">|</span>
+						<button onclick={gotoNext} title="Next (→)">next ›</button>
+					</nav>
+				{/if}
 
-					{#if relatedItems.length > 0}
-						<h3 class="related-heading">Related</h3>
-						<ul class="related-list">
-							{#each relatedItems.slice(0, 8) as item (item.id)}
-								<li class="related-list-item">
-									<a href="/reader/{item.id}" class="related-item-title">{item.title}</a>
-									<div class="related-item-meta">
-										{item.domain} • {Math.round(item.score * 100)}%
-									</div>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-
-					{#if relatedGroups.length > 0}
-						<h3 class="related-heading">Groups</h3>
-						<ul class="related-list">
-							{#each relatedGroups.slice(0, 6) as group (group.name)}
-								<li class="related-list-item related-group-row">
-									<span class="related-group-item">{group.name}</span>
-									<strong class="related-group-count">{group.count}</strong>
-								</li>
-							{/each}
-						</ul>
-					{/if}
+				{#if relatedItems.length > 0}
+					<h2 class="related-heading">Related</h2>
+					<ul class="related-list">
+						{#each relatedItems.slice(0, 8) as item (item.id)}
+							<li class="related-list-item">
+								<a href="/reader/{item.id}">{item.title}</a>
+								<span class="related-item-meta"> ({item.domain})</span>
+							</li>
+						{/each}
+					</ul>
 				{/if}
 			{:else}
 				<div class="empty">No content.</div>
 			{/if}
-		</main>
-
-	{#if queue.length > 1}
-		<footer class="reader-footer">
-			<div class="reader-footer-inner">
-				<span>Article {index + 1} of {queue.length}</span>
-				<div class="reader-footer-nav">
-					<button class="reader-btn" onclick={gotoPrev} title="Previous (←)">‹ Prev</button>
-					<button class="reader-btn" onclick={gotoNext} title="Next (→)">Next ›</button>
-				</div>
-			</div>
+		</div>
+		<footer class="hn-footer">
+			<a href="/">home</a> | <a href="/summary">past</a>
 		</footer>
-	{/if}
+	</main>
 </div>
 
 <style>
-	.reader-content {
-		padding: 2rem 0 4rem;
-	}
-
-	.reader-footer {
-		border-top: 1px solid var(--border);
-		padding: 1rem 0;
-		margin-top: 2rem;
-		font-family: Inter, system-ui, sans-serif;
-		font-size: 0.75rem;
-		color: var(--muted);
-	}
-
-	.reader-footer-inner {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.reader-footer-nav {
-		display: flex;
-		gap: 0.75rem;
-	}
-
-	.reader-btn {
-		padding: 0.25rem 0.625rem;
-		border: 1px solid var(--border);
-		background: var(--card);
-		color: var(--fg);
-		font-size: 0.75rem;
-		font-family: Inter, system-ui, sans-serif;
-		cursor: pointer;
-		border-radius: var(--radius);
-		text-decoration: none;
-		transition: background-color 150ms ease, border-color 150ms ease;
-	}
-
-	.reader-btn:hover {
-		background-color: rgba(0, 0, 0, 0.03);
-		border-color: var(--muted);
-	}
-
-	.reader-btn[disabled] {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.related-divider {
-		margin: 2rem 0;
-		border: none;
-		border-top: 1px solid var(--border);
-	}
-
-	.related-list {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-	}
-
-	.related-list-item {
-		padding: 0.5rem 0;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.related-group-row {
-		padding: 0.25rem 0;
-		display: flex;
-		justify-content: space-between;
-	}
-
-	.related-item-title {
-		font-family: Inter, system-ui, sans-serif;
-		font-size: 0.875rem;
-		color: var(--link);
-		border-bottom-color: transparent;
-	}
-
-	.related-item-meta {
-		font-family: Inter, system-ui, sans-serif;
-		font-size: 0.75rem;
-		color: var(--muted);
-		margin-top: 0.125rem;
-	}
-
-	.related-group-item {
-		font-family: Inter, system-ui, sans-serif;
-		font-size: 0.875rem;
-	}
-
-	.related-group-count {
-		font-family: Inter, system-ui, sans-serif;
-		font-size: 0.875rem;
-	}
-
-	.related-heading {
-		font-family: Inter, system-ui, sans-serif;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--muted);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	@media (prefers-color-scheme: dark) {
-		.reader-btn:hover {
-			background-color: rgba(255, 255, 255, 0.05);
-			border-color: var(--muted);
-		}
-	}
+	/* Reader chrome lives in app.css (HN text-only styles). */
 </style>

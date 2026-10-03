@@ -18,7 +18,7 @@ export interface LinkRecord {
 	submittedBy?: string; // who submitted the link
 }
 
-// Lazy-initialize client so routes that don't touch the DB never pay the cost
+// Lazily initialized so non-DB routes pay nothing.
 let _client: Client | null = null;
 
 export function getClient(): Client {
@@ -59,10 +59,7 @@ export async function initDb(): Promise<void> {
 
 export { EMBEDDING_DIM };
 
-/**
- * Strip sensitive fields that should never be exposed via public APIs.
- * Room comments are preserved; they're useful context and are intended to be public-facing.
- */
+// Strip sensitive fields from public API responses.
 export function sanitizeLink(obj: any): any {
 	const out = { ...obj };
 	delete out.submittedBy;
@@ -90,10 +87,7 @@ function normalizeUrl(u: string): string {
 	}
 }
 
-/**
- * Build a Link-shaped object from a joined row.
- * meta fields (title, url, domain, roomComment, tags, ...) are spread over the base row.
- */
+
 export function rowToLink(row: any): any {
 	const meta = row.meta ? JSON.parse(row.meta as string) : {};
 	const base: any = { id: row.id as string, ts: row.ts as number, count: row.count as number };
@@ -123,12 +117,7 @@ export interface LinksPage {
 	hasMore: boolean;
 }
 
-/**
- * Paginated, sanitized page of links for a rank mode. Shared by the
- * `/api/links` route and the SSR `+page.server.ts` load so the server-rendered
- * feed matches the API exactly. `rising` mode needs the full dataset and is
- * handled in-memory by the API route.
- */
+// Shared by `/api/links` and SSR load so server HTML matches the API.
 export async function getPaginatedLinks(options: {
 	mode?: 'latest' | 'top';
 	offset?: number;
@@ -158,10 +147,7 @@ export async function getPaginatedLinks(options: {
 	});
 	const total = (countResult.rows[0]?.count as number) || 0;
 
-	const items = result.rows.map((row: any, idx: number) => {
-		const link = sanitizeLink(rowToLink(row));
-		return { ...link, displayIndex: offset + idx + 1 };
-	});
+	const items = result.rows.map((row: any) => sanitizeLink(rowToLink(row)));
 
 	return { items, total, offset, limit, hasMore: offset + limit < total };
 }
@@ -187,7 +173,7 @@ export async function getLinkByUrl(url: string): Promise<any | null> {
 export async function deleteLinkById(id: string): Promise<boolean> {
 	await initDb();
 	try {
-		// Delete from links; link_index is configured with FK ON DELETE CASCADE, but clean both to be safe
+		// FK cascades, but clean both tables to be safe.
 		await getClient().execute({ sql: 'DELETE FROM links WHERE id = ?', args: [id] });
 		await getClient().execute({ sql: 'DELETE FROM link_index WHERE link_id = ?', args: [id] });
 		return true;

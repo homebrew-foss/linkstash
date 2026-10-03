@@ -3,10 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { deleteLinkById } from '$lib/server/db';
 import { isAuthorized } from '$lib/server/auth';
 
-/**
- * DELETE /api/admin/link
- * Delete a link by id. Gated by `Authorization: Bearer <AUTH_KEY>`.
- */
+// DELETE /api/admin/link: delete by id, gated by Bearer AUTH_KEY.
 export const DELETE: RequestHandler = async (event) => {
 	const authHeader = event.request.headers.get('authorization');
 	if (!isAuthorized(authHeader)) {

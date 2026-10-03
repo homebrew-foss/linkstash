@@ -3,10 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { getClient, initDb } from '$lib/server/db';
 import { getPostHogClient } from '$lib/server/posthog';
 
-/**
- * GET /api/content/[key]
- * Returns the stored markdown/plain-text content for a link id.
- */
+// GET /api/content/[key]: stored markdown content for a link id.
 export const GET: RequestHandler = async (event) => {
 	const { key } = event.params;
 
