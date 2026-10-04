@@ -14,26 +14,26 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@libsql/client": "^0.17.4",
-    "@sveltejs/adapter-cloudflare": "^7.2.9",
-    "@sveltejs/kit": "^2.70.2",
-    "@sveltejs/vite-plugin-svelte": "^7.2.0",
-    "@types/sanitize-html": "^2.16.1",
-    "js-yaml": "^5.2.3",
+    "@libsql/client": "^0.18.0",
+    "@sveltejs/adapter-cloudflare": "^8.0.0",
+    "@sveltejs/kit": "^3.0.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/sanitize-html": "^2.16.2",
+    "js-yaml": "^5.4.2",
     "lucide-svelte": "^1.0.1",
-    "marked": "^18.0.9",
-    "posthog-js": "^1.413.2",
-    "posthog-node": "^5.48.0",
-    "sanitize-html": "^2.17.6",
-    "svelte": "^5.56.8"
+    "marked": "^18.0.14",
+    "posthog-js": "^1.435.8",
+    "posthog-node": "^5.55.0",
+    "sanitize-html": "^2.18.0",
+    "svelte": "^5.57.1"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^26.1.2",
-    "svelte-check": "^4.7.4",
-    "typescript": "~6",
-    "vite": "^8.2.0",
-    "wrangler": "^4.119.0"
+    "@types/node": "^26.6.4",
+    "svelte-check": "^4.7.6",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.2",
+    "wrangler": "^4.147.0"
   },
   "keywords": [
     "links",
