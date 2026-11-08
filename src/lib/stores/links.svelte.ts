@@ -2,6 +2,7 @@ import { sortLinksByMode } from '#lib/sorting';
 import { getFromLocalStorage, setToLocalStorage, getLinksCacheKey } from '#lib/utils/storage';
 import { logger } from '#lib/logger';
 import { Effect } from 'effect';
+import { untrack } from 'svelte';
 import type { Link, RankMode } from '#lib/types';
 
 const LINKS_PER_PAGE = 10;
@@ -68,7 +69,8 @@ export function createPaginatedLinks(
 		// First client run keeps the SSR seed, then loads more via effect.
 		if (isSeeded) {
 			isSeeded = false;
-			Effect.runPromise(fetchLinks(offset)).catch(() => {
+			const startOffset = untrack(() => offset);
+			Effect.runPromise(fetchLinks(startOffset)).catch(() => {
 				// ignore errors on seeded load
 			});
 			return;
