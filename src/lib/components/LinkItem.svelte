@@ -1,7 +1,8 @@
 <script lang="ts">
 	import posthog from 'posthog-js';
-	import type { Link } from '$lib/types';
-	import { getLinkTitle, getLinkUrl, getLinkDomain, getRoomComment, getVoteCount } from '$lib/link-meta';
+	import type { Link } from '#lib/types';
+	import { getLinkTitle, getLinkUrl, getLinkDomain } from '#lib/link-meta';
+	import { Book } from 'lucide-svelte';
 
 	interface Props {
 		link: Link;
@@ -14,9 +15,9 @@
 	const url = $derived(getLinkUrl(link));
 	const title = $derived(getLinkTitle(link));
 	const domain = $derived(getLinkDomain(link));
-	const roomComment = $derived(getRoomComment(link));
-	const voteCount = $derived(getVoteCount(link));
 	const ts = $derived(link.ts || 0);
+
+	const faviconUrl = $derived(domain ? `https://www.google.com/s2/favicons?domain=${domain}` : '');
 
 	function timeAgo(t: number): string {
 		if (!t) return '';
@@ -28,55 +29,87 @@
 		if (days < 30) return `${days}d ago`;
 		return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 	}
+
+	function handleLinkClick() {
+		posthog.capture('link_clicked', {
+			link_title: title,
+			link_url: url,
+			link_domain: domain,
+			link_rank: rank,
+		});
+	}
+
+	function handleReaderClick(e: MouseEvent) {
+		e.stopPropagation();
+		posthog.capture('reader_opened_from_link', {
+			link_id: link.id,
+			link_title: title,
+			link_url: url
+		});
+		onOpenReader(link);
+	}
 </script>
 
 <li class="linklist-item">
 	<div class="link-row">
 		<span class="rank" aria-hidden="true">{rank}.</span>
 		<div class="link-main">
+			{#if faviconUrl}
+				<img class="favicon" src={faviconUrl} alt="" />
+			{/if}
 			{#if url}
 				<a
 					class="link-title"
 					href={url}
 					target="_blank"
 					rel="noopener noreferrer"
-					onclick={() => {
-						posthog.capture('link_clicked', {
-							link_title: title,
-							link_url: url,
-							link_domain: domain,
-							link_rank: rank,
-							vote_count: voteCount
-						});
-					}}
+					onclick={handleLinkClick}
 				>
 					{title}
 				</a>
 			{:else}
 				<span class="link-title">{title}</span>
 			{/if}
-			{#if domain}<span class="link-domain"> ({domain})</span>{/if}
 			<div class="link-meta">
-				{#if voteCount > 0}<span>{voteCount} {voteCount === 1 ? 'vote' : 'votes'}</span>{/if}
-				{#if roomComment}<span>by {roomComment}</span>{/if}
-				{#if ts}<span>{timeAgo(ts)}</span>{/if}
 				{#if link.id}
-					<span>
+					<span style="display: inline-flex; align-items: center; gap: 4px;">
 						<a
 							href="/reader/{link.id}"
 							aria-label="Open in reader view"
-							onclick={() => {
-								posthog.capture('reader_opened_from_link', {
-									link_id: link.id,
-									link_title: title,
-									link_url: url
-								});
-								onOpenReader(link);
-							}}>reader</a
+							onclick={handleReaderClick}
+							style="display: inline-flex; align-items: center; cursor: pointer;"
 						>
+							<Book size=13 />
+						</a>
 					</span>
 				{/if}
+				{#if ts}<span>{timeAgo(ts)}</span>{/if}
 			</div>
 		</div>
 	</div>
 </li>
+
+<style>
+	.favicon {
+		width: 16px;
+		height: 16px;
+		flex-shrink: 0;
+		margin-right: 4px;
+	}
+
+	.link-meta a {
+		color: var(--muted);
+		text-decoration: none;
+		font-size: 8pt;
+		cursor: pointer;
+	}
+
+	.link-meta a:hover {
+		text-decoration: underline;
+	}
+
+	.link-meta > span {
+		font-size: 8pt;
+		color: var(--muted);
+	}
+</style>

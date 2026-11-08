@@ -1,4 +1,3 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 
 // Reader asset proxy. SSRF guard: http(s) only, size-capped, no local hosts.
@@ -12,22 +11,22 @@ function isLocalHost(hostname: string): boolean {
 export const GET: RequestHandler = async (event) => {
 	try {
 		const urlParam = event.url.searchParams.get('url');
-		if (!urlParam) return json({ error: 'Missing url' }, { status: 400 });
+		if (!urlParam) return Response.json({ error: 'Missing url' }, { status: 400 });
 
 		let url: URL;
 		try {
 			url = new URL(urlParam);
 		} catch (e) {
-			return json({ error: 'Invalid url' }, { status: 400 });
+			return Response.json({ error: 'Invalid url' }, { status: 400 });
 		}
 
 		if (!['http:', 'https:'].includes(url.protocol)) {
-			return json({ error: 'Unsupported protocol' }, { status: 400 });
+			return Response.json({ error: 'Unsupported protocol' }, { status: 400 });
 		}
 
 		// Basic local network protection
 		if (isLocalHost(url.hostname)) {
-			return json({ error: 'Refusing to proxy local addresses' }, { status: 403 });
+			return Response.json({ error: 'Refusing to proxy local addresses' }, { status: 403 });
 		}
 
 
@@ -42,7 +41,7 @@ export const GET: RequestHandler = async (event) => {
 
 		if (!res.ok) {
 			console.warn('Upstream fetch failed', url.toString(), res.status, res.statusText);
-			return json({ error: 'Upstream fetch failed' }, { status: res.status });
+			return Response.json({ error: 'Upstream fetch failed' }, { status: res.status });
 		}
 
 		const contentType = res.headers.get('content-type') || 'application/octet-stream';
@@ -50,7 +49,7 @@ export const GET: RequestHandler = async (event) => {
 		if (contentLengthHeader) {
 			const len = parseInt(contentLengthHeader, 10);
 			if (!Number.isNaN(len) && len > MAX_BYTES) {
-				return json({ error: 'Resource too large' }, { status: 413 });
+				return Response.json({ error: 'Resource too large' }, { status: 413 });
 			}
 		}
 
@@ -64,6 +63,6 @@ export const GET: RequestHandler = async (event) => {
 		});
 	} catch (err) {
 		console.error('Proxy error', err);
-		return json({ error: 'Proxy internal error' }, { status: 500 });
+		return Response.json({ error: 'Proxy internal error' }, { status: 500 });
 	}
 };

@@ -1,8 +1,7 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
-import { getClient, initDb } from '$lib/server/db';
-import { getPostHogClient } from '$lib/server/posthog';
+import { AUTH_KEY, LAVA_URL } from '$app/env/private';
+import { getClient, initDb } from '#lib/server/db';
+import { getPostHogClient } from '#lib/server/posthog';
 import { load as loadYaml } from 'js-yaml';
 import { createHash } from 'crypto';
 
@@ -25,9 +24,7 @@ interface AddRequestBody {
 const DEFAULT_VOTE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
 function getVoteCooldownMs(): number {
-	const raw = Number(env.VOTE_COOLDOWN_MS || DEFAULT_VOTE_COOLDOWN_MS);
-	if (!Number.isFinite(raw) || raw < 0) return DEFAULT_VOTE_COOLDOWN_MS;
-	return raw;
+	return DEFAULT_VOTE_COOLDOWN_MS;
 }
 
 function createVoterFingerprint(submittedBy?: string | null, roomId?: string | null): string {
@@ -83,8 +80,8 @@ export const POST: RequestHandler = async (event) => {
 
 	// Check auth
 	const authHeader = request.headers.get('authorization');
-	if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.slice(7) !== env.AUTH_KEY) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+	if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.slice(7) !== AUTH_KEY) {
+		return Response.json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
 	// Parse JSON body and validate shape
@@ -92,12 +89,12 @@ export const POST: RequestHandler = async (event) => {
 	try {
 		body = await request.json();
 	} catch (e) {
-		return json({ error: 'Invalid JSON body' }, { status: 400 });
+		return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
 	}
 
 	const { link, room } = body as AddRequestBody;
 	if (!link) {
-		return json({ error: 'Missing link' }, { status: 400 });
+		return Response.json({ error: 'Missing link' }, { status: 400 });
 	}
 
 	// Determine URL and submitter
@@ -109,14 +106,14 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	if (!urlStr) {
-		return json({ error: 'Missing link URL' }, { status: 400 });
+		return Response.json({ error: 'Missing link URL' }, { status: 400 });
 	}
 
 	try {
 		// this will throw if invalid
 		new URL(urlStr);
 	} catch (e) {
-		return json({ error: 'Invalid URL' }, { status: 400 });
+		return Response.json({ error: 'Invalid URL' }, { status: 400 });
 	}
 
 	const submitter =
@@ -128,13 +125,13 @@ export const POST: RequestHandler = async (event) => {
 	try {
 		// Legacy LAVA_URL still works; default is the defuddle.md converter.
 		const parseLink = async (linkUrl: string) => {
-			if (env.LAVA_URL) {
+			if (LAVA_URL) {
 				// old behaviour: forward to lava
 				const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-				if (env.AUTH_KEY) {
-					headers['Authorization'] = 'Bearer ' + env.AUTH_KEY;
+				if (AUTH_KEY) {
+					headers['Authorization'] = 'Bearer ' + AUTH_KEY;
 				}
-				const apiRes = await fetch(env.LAVA_URL + '/api', {
+				const apiRes = await fetch(LAVA_URL + '/api', {
 					method: 'POST',
 					headers,
 					body: JSON.stringify({
@@ -196,7 +193,7 @@ export const POST: RequestHandler = async (event) => {
 		} catch (err: any) {
 			const message = String(err.message || err);
 			if (message.startsWith('upstream-rejected:')) {
-				return json(
+				return Response.json(
 					{
 						error: 'Upstream rejected link: ensure you are sending a URL string (not an object)',
 						details: message.replace(/^upstream-rejected:/, '')
@@ -205,7 +202,7 @@ export const POST: RequestHandler = async (event) => {
 				);
 			}
 			console.error('parser error', message);
-			return json({ error: 'Upstream error', details: message }, { status: 502 });
+			return Response.json({ error: 'Upstream error', details: message }, { status: 502 });
 		}
 
 		await initDb();
@@ -442,9 +439,9 @@ export const POST: RequestHandler = async (event) => {
 			}
 		}
 
-		return json({ ok: true });
+		return Response.json({ ok: true });
 	} catch (error) {
 		console.error('Error in add endpoint:', error);
-		return json({ error: 'Internal server error' }, { status: 500 });
+		return Response.json({ error: 'Internal server error' }, { status: 500 });
 	}
 };

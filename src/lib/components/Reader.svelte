@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { browser } from '$app/env';
+	import { Effect } from 'effect';
 	import posthog from 'posthog-js';
-	import Header from '$lib/components/Header.svelte';
-	import { renderMarkdown } from '$lib/markdown';
-	import { extractFirstHeading } from '$lib/text-utils';
-	import { getLinksCacheKey, getFromLocalStorage, setToLocalStorage } from '$lib/utils/storage';
-	import { READER_CONTENT_LOAD_TIMEOUT_MS } from '$lib/constants';
+	import Header from '#lib/components/Header.svelte';
+	import { renderMarkdown } from '#lib/markdown';
+	import { extractFirstHeading } from '#lib/text-utils';
+	import { getLinksCacheKey, getFromLocalStorage, setToLocalStorage } from '#lib/utils/storage';
+	import { READER_CONTENT_LOAD_TIMEOUT_MS } from '#lib/constants';
 
 	interface SuggestedItem {
 		id: string;
@@ -38,7 +40,9 @@
 	const currentId = $derived(queue.length > 0 ? queue[index] : undefined);
 	const currentMeta = $derived(currentId ? metas[currentId] : null);
 
+	// Online/offline listeners — no fetch, runs on client only.
 	$effect(() => {
+		if (!browser) return;
 		const handleOnline = () => (isOnline = true);
 		const handleOffline = () => (isOnline = false);
 		window.addEventListener('online', handleOnline);
@@ -50,39 +54,48 @@
 		};
 	});
 
+	// Build the navigation queue from the URL path or hash.
+	const fetchLinksPage = Effect.gen(function* () {
+		const res = yield* Effect.promise(() =>
+			fetch('/api/links?limit=500&offset=0&mode=latest')
+		);
+		if (!res.ok) return null as { items: any[] } | null;
+		const data = yield* Effect.promise(() => res.json());
+		return { items: data.items || data || [] };
+	});
+
 	$effect(() => {
+		if (!browser) return;
+
 		const path = page.url.pathname;
 		const hash = page.url.hash.replace(/^#/, '');
 
-		const readLocation = async () => {
-			const pathMatch = path.match(/^\/reader\/([^\/]+)$/);
-			const pathId = pathMatch?.[1] ? decodeURIComponent(pathMatch[1]) : '';
+		const pathMatch = path.match(/^\/reader\/([^\/]+)$/);
+		const pathId = pathMatch?.[1] ? decodeURIComponent(pathMatch[1]) : '';
 
-			const hashIds = hash
-				.split(',')
-				.map((s) => s.trim())
-				.filter(Boolean);
+		const hashIds = hash
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean);
 
-			const ids = pathId ? [pathId] : hashIds;
+		const ids = pathId ? [pathId] : hashIds;
 
-			if (ids.length === 0) {
-				queue = [];
-				index = 0;
-				return;
-			}
+		if (ids.length === 0) {
+			queue = [];
+			index = 0;
+			locationReady = true;
+			return;
+		}
 
-			if (ids.length === 1) {
-				const single = ids[0];
-				try {
-					const res = await fetch('/api/links?limit=500&offset=0&mode=latest');
-					if (!res.ok) {
-						queue = [single];
-						index = 0;
-						return;
-					}
-					const data = await res.json();
-					const links = data.items || data || [];
-					const allIds = (links as any[])
+		if (ids.length === 1) {
+			const single = ids[0];
+			Effect.runPromise(fetchLinksPage).then((result) => {
+				if (!result) {
+					queue = [single];
+					index = 0;
+				} else {
+					const links = result.items as any[];
+					const allIds = links
 						.filter((l) => l.id)
 						.map((l) => l.id);
 					const pos = allIds.indexOf(single);
@@ -93,23 +106,23 @@
 						queue = [single, ...allIds.filter((i: string) => i !== single)];
 						index = 0;
 					}
-				} catch (e) {
-					queue = [single];
-					index = 0;
 				}
-			} else {
-				queue = ids;
+				locationReady = true;
+			}).catch(() => {
+				queue = [single];
 				index = 0;
-			}
-		};
-
-		readLocation().finally(() => {
+				locationReady = true;
+			});
+		} else {
+			queue = ids;
+			index = 0;
 			locationReady = true;
-		});
+		}
 	});
 
+	// Populate metas from localStorage cache for the current queue.
 	$effect(() => {
-		if (!queue.length) return;
+		if (!browser || !queue.length) return;
 
 		posthog.capture('reader_page_opened', {
 			queue_length: queue.length,
@@ -133,32 +146,41 @@
 		metas = filtered;
 	});
 
-	$effect(() => {
-		if (!currentId || metas[currentId]) return;
-
-		(async () => {
-			try {
-				const res = await fetch('/api/links?limit=500&offset=0&mode=latest');
-				if (!res.ok) return;
-				const data = await res.json();
-				const items = data.items || [];
-
-				const currentItem = items.find((l: any) => l.id === currentId);
-				if (currentItem) {
-					metas = { ...metas, [currentId]: currentItem };
-				}
-			} catch (e) {
-			}
-		})();
+	// Fetch meta for currentId when it's not already cached.
+	const fetchMetaForId = Effect.gen(function* () {
+		const res = yield* Effect.promise(() =>
+			fetch('/api/links?limit=500&offset=0&mode=latest')
+		);
+		if (!res.ok) return null;
+		const data = yield* Effect.promise(() => res.json());
+		const items = data.items || [];
+		const currentItem = items.find((l: any) => l.id === currentId!);
+		return currentItem || null;
 	});
 
 	$effect(() => {
+		if (!browser) return;
+		if (!currentId || metas[currentId]) return;
+
+		Effect.runPromise(fetchMetaForId).then((result) => {
+			if (result) {
+				metas = { ...metas, [currentId!]: result };
+			}
+		}).catch(() => {
+			// silently ignore meta fetch failures
+		});
+	});
+
+	// Load content for the current link.
+	$effect(() => {
+		if (!browser) return;
 		const id = currentId;
 		if (!id) return;
 
 		let cancelled = false;
+		let controller: AbortController | null = null;
 
-		(async () => {
+		const run = () => {
 			loading = true;
 			error = null;
 			content = null;
@@ -172,66 +194,87 @@
 					content = cached.content;
 					isFromCache = true;
 				}
-			} catch (err) {
+			} catch {
+				// ignore cache read errors
 			}
 
 			try {
-				const controller = new AbortController();
+				controller = new AbortController();
 				let timedOut = false;
 				const timeoutId = window.setTimeout(() => {
 					timedOut = true;
-					controller.abort();
+					controller?.abort();
 					if (!cancelled) {
-						// Keep cached content visible on timeout; only error when empty.
 						if (!content) error = 'Timeout loading content';
 						loading = false;
 					}
 				}, READER_CONTENT_LOAD_TIMEOUT_MS);
 
-				const res = await fetch(`/api/content/${id}`, { signal: controller.signal });
-				clearTimeout(timeoutId);
-				if (cancelled || timedOut) return;
-				if (!res.ok) {
-					// Keep cached content if the refresh fails.
-					if (!content) error = `Content not found (${res.status})`;
-					return;
-				}
-				const txt = await res.text();
-				if (cancelled) return;
+				const contentEffect = Effect.gen(function* () {
+					const res = yield* Effect.promise(() =>
+						fetch(`/api/content/${id}`, { signal: controller!.signal })
+					);
+					if (!res.ok) return null as string | null;
+					return yield* Effect.promise(() => res.text());
+				});
 
-				content = txt;
-				isFromCache = false;
+				Effect.runPromise(contentEffect).then((txt) => {
+					clearTimeout(timeoutId);
 
-				setToLocalStorage(`reader:content:${id}`, { ts: Date.now(), content: txt });
+					if (cancelled || timedOut) return;
+					if (txt === null) return; // error already set
 
-				const extracted = extractFirstHeading(txt || '');
-				if (extracted.h1) {
-					const cache = getFromLocalStorage<any[]>(getLinksCacheKey('latest'));
-					if (cache) {
-						const arr = cache;
-						const idx = arr.findIndex((a) => a.id === id);
-						if (idx >= 0) {
-							const entry = arr[idx];
-							if (!entry.meta) entry.meta = {};
-							if (!entry.meta.title) {
-								entry.meta.title = extracted.h1;
-								arr[idx] = entry;
-								setToLocalStorage(getLinksCacheKey('latest'), arr);
-								metas = { ...metas, [id]: entry };
+					content = txt as string;
+					isFromCache = false;
+
+					setToLocalStorage(`reader:content:${id}`, {
+						ts: Date.now(),
+						content: txt as string
+					});
+
+					const extracted = extractFirstHeading(txt as string || '');
+					if (extracted.h1) {
+						const cache = getFromLocalStorage<any[]>(
+							getLinksCacheKey('latest')
+						);
+						if (cache) {
+							const arr = cache;
+							const idx = arr.findIndex((a) => a.id === id);
+							if (idx >= 0) {
+								const entry = arr[idx];
+								if (!entry.meta) entry.meta = {};
+								if (!entry.meta.title) {
+									entry.meta.title = extracted.h1;
+									arr[idx] = entry;
+									setToLocalStorage(
+										getLinksCacheKey('latest'),
+										arr
+									);
+									metas = { ...metas, [id]: entry };
+								}
 							}
 						}
 					}
-				}
+				}).catch((e) => {
+					if (cancelled) return;
+					if (!((e as any)?.name === 'AbortError') && !content)
+						error = 'Error loading content';
+				}).finally(() => {
+					if (!cancelled) loading = false;
+				});
 			} catch (e) {
 				if (cancelled) return;
-				if (!((e as any)?.name === 'AbortError') && !content) error = 'Error loading content';
-			} finally {
-				if (!cancelled) loading = false;
+				if (!((e as any)?.name === 'AbortError') && !content)
+					error = 'Error loading content';
+				loading = false;
 			}
-		})();
+		};
+
+		void run();
 
 		return () => {
 			cancelled = true;
+			controller?.abort();
 		};
 	});
 
@@ -262,6 +305,7 @@
 	}
 
 	$effect(() => {
+		if (!browser) return;
 		void index;
 		void queue;
 
@@ -306,6 +350,7 @@
 	}
 
 	$effect(() => {
+		if (!browser) return;
 		const el = readerEl;
 		if (!el) return;
 		el.addEventListener('touchstart', handleTouchStart, { passive: true });
@@ -316,23 +361,29 @@
 		};
 	});
 
+	// Fetch related items for the current link.
+	const fetchRelated = Effect.gen(function* () {
+		const res = yield* Effect.promise(() =>
+			fetch(`/api/related/${encodeURIComponent(currentId!)}`)
+		);
+		if (!res.ok) return [] as any[];
+		const payload = yield* Effect.promise(() => res.json());
+		return Array.isArray(payload.related) ? payload.related : [];
+	});
+
 	$effect(() => {
+		if (!browser) return;
 		const id = currentId;
 		if (!id) {
 			relatedItems = [];
 			return;
 		}
 
-		(async () => {
-			try {
-				const res = await fetch(`/api/related/${encodeURIComponent(id)}`);
-				if (!res.ok) return;
-				const payload = await res.json();
-				relatedItems = Array.isArray(payload.related) ? payload.related : [];
-			} catch (e) {
-				relatedItems = [];
-			}
-		})();
+		Effect.runPromise(fetchRelated).then((related) => {
+			relatedItems = related as SuggestedItem[];
+		}).catch(() => {
+			relatedItems = [];
+		});
 	});
 
 	const defaultH1Text = $derived.by(() => {
@@ -341,7 +392,8 @@
 		if (currentMeta?.url) {
 			try {
 				return new URL(currentMeta.url).hostname;
-			} catch (e) {
+			} catch {
+				// ignore
 			}
 		}
 		if (currentId) return currentId;
@@ -359,6 +411,7 @@
 	});
 
 	$effect(() => {
+		if (!browser) return;
 		const el = articleEl;
 		if (!el) return;
 		const handleError = (e: Event) => {

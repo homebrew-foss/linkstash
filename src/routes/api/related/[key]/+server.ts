@@ -1,7 +1,6 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { getClient, initDb } from '$lib/server/db';
-import { buildSemanticSource, embedText, embeddingToJson, hashSource } from '$lib/semantic';
+import { getClient, initDb } from '#lib/server/db';
+import { buildSemanticSource, embedText, embeddingToJson, hashSource } from '#lib/semantic';
 
 type LinkRow = {
 	id: string;
@@ -146,7 +145,7 @@ function toSuggestion(row: any) {
 export const GET: RequestHandler = async (event) => {
 	const { key } = event.params;
 	if (!key) {
-		return json({ error: 'Missing key' }, { status: 400 });
+		return Response.json({ error: 'Missing key' }, { status: 400 });
 	}
 
 	try {
@@ -154,7 +153,7 @@ export const GET: RequestHandler = async (event) => {
 
 		const current = await ensureEmbeddingForLink(key);
 		if (!current) {
-			return json({ error: 'Not found' }, { status: 404 });
+			return Response.json({ error: 'Not found' }, { status: 404 });
 		}
 
 		await ensureRecentEmbeddings(50);
@@ -220,13 +219,13 @@ export const GET: RequestHandler = async (event) => {
 			.slice(0, 10)
 			.map(([name, count]) => ({ name, count }));
 
-		return json({
+		return Response.json({
 			sourceId: key,
 			related,
 			groups
 		});
 	} catch (error) {
 		console.error('Error in related endpoint:', error);
-		return json({ error: 'Internal server error' }, { status: 500 });
+		return Response.json({ error: 'Internal server error' }, { status: 500 });
 	}
 };

@@ -1,14 +1,13 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { getClient, initDb } from '$lib/server/db';
-import { getPostHogClient } from '$lib/server/posthog';
+import { getClient, initDb } from '#lib/server/db';
+import { getPostHogClient } from '#lib/server/posthog';
 
 // GET /api/content/[key]: stored markdown content for a link id.
 export const GET: RequestHandler = async (event) => {
 	const { key } = event.params;
 
 	if (!key) {
-		return json({ error: 'Missing content key' }, { status: 400 });
+		return Response.json({ error: 'Missing content key' }, { status: 400 });
 	}
 
 	try {
@@ -20,7 +19,7 @@ export const GET: RequestHandler = async (event) => {
 		});
 
 		if (result.rows.length === 0) {
-			return json({ error: 'Not found' }, { status: 404 });
+			return Response.json({ error: 'Not found' }, { status: 404 });
 		}
 
 		// Track content fetched event with PostHog
@@ -39,6 +38,6 @@ export const GET: RequestHandler = async (event) => {
 		});
 	} catch (error) {
 		console.error('Error in content endpoint:', error);
-		return json({ error: 'Internal server error' }, { status: 500 });
+		return Response.json({ error: 'Internal server error' }, { status: 500 });
 	}
 };

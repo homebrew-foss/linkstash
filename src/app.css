@@ -33,9 +33,9 @@ body {
 }
 
 .app-main {
-	max-width: 900px;
+	max-width: 800px;
 	margin: 0 auto;
-	padding: 0 0 2rem;
+	padding: 0 0 1.5rem;
 	background: var(--bg);
 }
 
@@ -88,21 +88,22 @@ a:visited {
 	gap: 0.5rem;
 	padding: 2px 8px 2px 2px;
 	min-height: 24px;
-	max-width: 1200px;
+	max-width: 800px;
 	margin-inline: auto;
 }
 
 .header-logo {
-	width: 18px;
+	width: 22px;
 	height: 18px;
 	border: 1px solid #ffffff;
 	color: #ffffff;
 	font-weight: bold;
 	font-size: 13px;
-	line-height: 16px;
+	line-height: 18px;
 	text-align: center;
 	flex-shrink: 0;
 	text-decoration: none;
+	margin-right: 0.5rem;
 }
 
 a.header-logo:hover {
@@ -190,7 +191,7 @@ a.header-logo:hover {
 	gap: 0.5rem;
 	font-size: 10pt;
 	color: var(--muted);
-	padding: 6px 8px;
+	padding: 4px 8px;
 }
 
 .feed-toolbar a,
@@ -218,46 +219,56 @@ a.header-logo:hover {
 .linklist {
 	list-style: none;
 	margin: 0;
-	padding: 8px 8px 12px;
+	padding: 2px 4px 6px;
 }
 
 .hn-list {
 	list-style: none;
 	margin: 0;
-	padding: 8px 4px 12px;
+	padding: 2px 4px 6px;
 }
 
 .linklist-item {
 	padding: 0;
 	border: none;
-	margin-bottom: 6px;
+	margin-bottom: 4px;
 }
 
 .link-row {
 	display: flex;
-	align-items: baseline;
-	gap: 0.3rem;
+	align-items: center;
+	gap: 12px;
+	white-space: nowrap;
 }
 
 .rank {
 	color: var(--muted);
-	font-size: 10pt;
-	width: 2.4rem;
+	font-size: 8pt;
+	width: 1.4rem;
 	text-align: right;
 	flex-shrink: 0;
 	font-variant-numeric: tabular-nums;
 }
 
 .link-main {
+	display: flex;
+	align-items: center;
 	flex: 1;
 	min-width: 0;
-	overflow-wrap: break-word;
+	overflow: hidden;
+	gap: 4px;
 }
 
 .link-title {
+	display: block;
+	flex: 1;
+	min-width: 0;
 	font-size: 10pt;
 	color: var(--link);
-	line-height: 1.35;
+	line-height: 1.3;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .link-title:visited {
@@ -267,12 +278,19 @@ a.header-logo:hover {
 .link-domain {
 	font-size: 8pt;
 	color: var(--muted);
+	white-space: nowrap;
+	flex-shrink: 0;
 }
 
 .link-meta {
+	display: flex;
+	align-items: center;
+	gap: 4px;
 	font-size: 7pt;
 	color: var(--muted);
-	margin-top: 1px;
+	margin-top: 0;
+	flex-shrink: 0;
+	margin-right: 0.5rem;
 }
 
 .link-meta a {
@@ -289,6 +307,14 @@ a.header-logo:hover {
 	padding: 1.5rem 1rem;
 	color: var(--muted);
 	font-size: 10pt;
+}
+
+.error {
+	padding: 1.5rem 1rem;
+	color: #900;
+	font-size: 10pt;
+	background: #fdecec;
+	border: 1px solid #e0b0b0;
 }
 
 .load-more-sentinel {
@@ -815,19 +841,15 @@ a.header-logo:hover {
 	.app-main,
 	.reader,
 	.hn-footer {
-		max-width: 1200px;
+		max-width: 800px;
 		margin-inline: auto;
 	}
 
-	.app-main {
-		padding-inline: 24px;
-	}
-
 	.hn-list {
-		padding-inline: 16px;
+		padding-inline: 0px;
 	}
 
 	.feed-toolbar {
-		padding-inline: 24px;
+		padding-inline: 0px;
 	}
 }

@@ -21,6 +21,10 @@
 		}
 	},
 
+	"alias": {
+		"@opentelemetry/api": "./src/lib/shims/opentelemetry-api.ts"
+	},
+
 	"vars": {
 		"LAVA_URL": "https://lava-linkstash.onrender.com"
 	},

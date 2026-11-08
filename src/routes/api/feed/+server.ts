@@ -1,7 +1,6 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { getClient, initDb } from '$lib/server/db';
-import { logger } from '$lib/logger';
+import { getClient, initDb } from '#lib/server/db';
+import { logger } from '#lib/logger';
 
 function escapeXml(s: string): string {
 	return s
@@ -123,6 +122,6 @@ export const GET: RequestHandler = async (event) => {
 		});
 	} catch (error) {
 		logger.error('Error generating RSS feed', error);
-		return json({ error: 'Internal server error' }, { status: 500 });
+		return Response.json({ error: 'Internal server error' }, { status: 500 });
 	}
 };

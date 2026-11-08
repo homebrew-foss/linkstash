@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LinksClient from '$lib/components/LinksClient.svelte';
+	import LinksClient from '#lib/components/LinksClient.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

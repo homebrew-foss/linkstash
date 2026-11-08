@@ -1,9 +1,8 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { getClient, initDb, sanitizeLink, getLinkByUrl, rowToLink, getPaginatedLinks } from '$lib/server/db';
-import { sortLinksByMode, normalizeRankMode } from '$lib/sorting';
-import { logger } from '$lib/logger';
-import type { Link, RankMode } from '$lib/types';
+import { getClient, initDb, sanitizeLink, getLinkByUrl, rowToLink, getPaginatedLinks } from '#lib/server/db';
+import { sortLinksByMode, normalizeRankMode } from '#lib/sorting';
+import { logger } from '#lib/logger';
+import type { Link, RankMode } from '#lib/types';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -30,9 +29,9 @@ export const GET: RequestHandler = async (event) => {
 		if (queryUrl) {
 			const link = await getLinkByUrl(queryUrl);
 			if (!link) {
-				return json({ error: 'Link not found' }, { status: 404 });
+				return Response.json({ error: 'Link not found' }, { status: 404 });
 			}
-			return json(link);
+			return Response.json(link);
 		}
 
 		await initDb();
@@ -57,7 +56,7 @@ export const GET: RequestHandler = async (event) => {
 			const total = sorted.length;
 			const paged = sorted.slice(offset, offset + limit);
 
-			return json({
+			return Response.json({
 				items: paged,
 				total,
 				offset,
@@ -79,7 +78,7 @@ export const GET: RequestHandler = async (event) => {
 			const links: Link[] = fullResult.rows.map(mapRow).slice(offset, offset + limit);
 
 			const total = fullResult.rows.length;
-			return json({
+			return Response.json({
 				items: links,
 				total,
 				offset,
@@ -90,7 +89,7 @@ export const GET: RequestHandler = async (event) => {
 
 
 		const page = await getPaginatedLinks({ mode: mode as 'latest' | 'top', offset, limit });
-		return json({
+			return Response.json({
 			items: page.items,
 			total: page.total,
 			offset: page.offset,
@@ -99,6 +98,6 @@ export const GET: RequestHandler = async (event) => {
 		});
 	} catch (error) {
 		logger.error('Error fetching links', error);
-		return json({ error: 'Internal server error' }, { status: 500 });
+			return Response.json({ error: 'Internal server error' }, { status: 500 });
 	}
 };

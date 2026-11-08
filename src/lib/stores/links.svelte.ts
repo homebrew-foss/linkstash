@@ -1,9 +1,10 @@
-import { sortLinksByMode } from '$lib/sorting';
-import { getFromLocalStorage, setToLocalStorage, getLinksCacheKey } from '$lib/utils/storage';
-import { logger } from '$lib/logger';
-import type { Link, RankMode } from '$lib/types';
+import { sortLinksByMode } from '#lib/sorting';
+import { getFromLocalStorage, setToLocalStorage, getLinksCacheKey } from '#lib/utils/storage';
+import { logger } from '#lib/logger';
+import { Effect } from 'effect';
+import type { Link, RankMode } from '#lib/types';
 
-const LINKS_PER_PAGE = 50;
+const LINKS_PER_PAGE = 10;
 
 export interface PaginatedLinksInitial {
 	items: Link[];
@@ -24,10 +25,10 @@ export function createPaginatedLinks(
 	let offset = $state(initial ? initial.items.length : 0);
 	let allLinksCount = $state(initial ? initial.total : 0);
 
-	let isSeeded = $state(Boolean(initial));
+	let isSeeded = Boolean(initial);
 
-	async function fetchLinks(pageOffset = 0) {
-		try {
+	const fetchLinks = (pageOffset: number) =>
+		Effect.gen(function* () {
 			if (pageOffset === 0) {
 				const cacheKey = getLinksCacheKey(mode);
 				const cached = getFromLocalStorage<Link[]>(cacheKey);
@@ -36,16 +37,18 @@ export function createPaginatedLinks(
 				}
 			}
 
-			const response = await fetch(
-				`/api/links?mode=${mode}&offset=${pageOffset}&limit=${LINKS_PER_PAGE}`
+			const res = yield* Effect.promise(() =>
+				fetch(
+					`/api/links?mode=${mode}&offset=${pageOffset}&limit=${LINKS_PER_PAGE}`
+				)
 			);
-			if (!response.ok) {
-				logger.warn(`Failed to fetch links: ${response.status}`);
+			if (!res.ok) {
+				logger.warn(`Failed to fetch links: ${res.status}`);
 				if (pageOffset === 0) isLoading = false;
 				return;
 			}
 
-			const data = await response.json();
+			const data = yield* Effect.promise(() => res.json());
 			const sorted = sortLinksByMode(data.items || [], mode);
 
 			if (pageOffset === 0) {
@@ -56,22 +59,18 @@ export function createPaginatedLinks(
 			}
 
 			allLinksCount = data.total || 0;
-			hasMore = pageOffset + LINKS_PER_PAGE < allLinksCount;
-			offset = pageOffset + LINKS_PER_PAGE;
-		} catch (error) {
-			logger.error('Error fetching links', error);
-			if (pageOffset === 0) isLoading = false;
-		} finally {
-			if (pageOffset === 0) isLoading = false;
-		}
-	}
+			hasMore = data.items?.length >= LINKS_PER_PAGE;
+			offset = pageOffset + (data.items?.length || 0);
+		});
 
 	$effect(() => {
-
 		void mode;
-		// First client run keeps the SSR seed instead of re-fetching.
+		// First client run keeps the SSR seed, then loads more via effect.
 		if (isSeeded) {
 			isSeeded = false;
+			Effect.runPromise(fetchLinks(offset)).catch(() => {
+				// ignore errors on seeded load
+			});
 			return;
 		}
 		links = null;
@@ -79,12 +78,16 @@ export function createPaginatedLinks(
 		allLinksCount = 0;
 		hasMore = true;
 		isLoading = true;
-		fetchLinks(0);
+		Effect.runPromise(fetchLinks(0)).catch(() => {
+			// ignore errors
+		});
 	});
 
 	function loadMore() {
 		if (!isLoading && hasMore) {
-			fetchLinks(offset);
+			Effect.runPromise(fetchLinks(offset)).catch(() => {
+				// ignore errors
+			});
 		}
 	}
 

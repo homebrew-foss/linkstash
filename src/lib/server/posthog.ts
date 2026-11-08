@@ -1,17 +1,17 @@
 import { PostHog } from 'posthog-node';
-import { env } from '$env/dynamic/public';
-import { env as privateEnv } from '$env/dynamic/private';
+import { PUBLIC_POSTHOG_KEY, PUBLIC_POSTHOG_HOST } from '$app/env/public';
 
 let posthogClient: PostHog | null = null;
 
 export function getPostHogClient(): PostHog {
 	if (!posthogClient) {
-		posthogClient = new PostHog(env.PUBLIC_POSTHOG_KEY ?? '', {
-			host: env.PUBLIC_POSTHOG_HOST,
+		posthogClient = new PostHog(PUBLIC_POSTHOG_KEY ?? '', {
+			host: PUBLIC_POSTHOG_HOST,
 			flushAt: 1,
 			flushInterval: 0
 		});
-		if (privateEnv.DEV) {
+		// @ts-expect-error - import.meta.dev is injected by Vite/SvelteKit at build time
+		if (import.meta.dev) {
 			posthogClient.debug(true);
 		}
 	}

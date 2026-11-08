@@ -1,5 +1,5 @@
-import { logger } from '$lib/logger';
-import { LINKS_CACHE_PREFIX } from '$lib/constants';
+import { logger } from '#lib/logger';
+import { LINKS_CACHE_PREFIX } from '#lib/constants';
 
 export function getFromLocalStorage<T>(key: string): T | null {
 	try {

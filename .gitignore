@@ -13,3 +13,4 @@ scripts/import-test.sh
 
 # Cloudflare (adapter-cloudflare build output)
 .cloudflare
+.dev.vars

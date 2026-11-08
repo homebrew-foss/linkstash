@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Effect } from 'effect';
 	import { goto } from '$app/navigation';
 	import posthog from 'posthog-js';
 
@@ -23,17 +24,46 @@
 	// One fetch per open session; keystrokes filter in memory.
 	let allLinksCache: Result[] | null = null;
 
-	async function getAllLinks(): Promise<Result[]> {
-		if (allLinksCache) return allLinksCache;
-		const response = await fetch('/api/links?limit=10000&offset=0&mode=latest');
-		if (!response.ok) return [];
-		const data = await response.json();
-		allLinksCache = (data.items || data || []) as Result[];
-		return allLinksCache;
-	}
+	const fetchAllLinks = Effect.gen(function* () {
+		const res = yield* Effect.promise(() =>
+			fetch('/api/links?limit=200&offset=0&mode=latest')
+		);
+		if (!res.ok) return [] as Result[];
+		const data = yield* Effect.promise(() => res.json());
+		return (data.items || data || []) as Result[];
+	});
+
+	// Fetch links once when the palette opens. Cancellation via AbortController.
+	let fetchController: AbortController | null = null;
 
 	$effect(() => {
-		if (!isOpen) allLinksCache = null;
+		if (!isOpen) {
+			allLinksCache = null;
+			fetchController?.abort();
+			fetchController = null;
+			return;
+		}
+
+		fetchController = new AbortController();
+
+		const run = () => {
+			Effect.runPromise(fetchAllLinks).then((links) => {
+				if (!fetchController?.signal.aborted) {
+					allLinksCache = links;
+				}
+			}).catch(() => {
+				if (!fetchController?.signal.aborted) {
+					allLinksCache = [];
+				}
+			});
+		};
+
+		run();
+
+		return () => {
+			fetchController?.abort();
+			fetchController = null;
+		};
 	});
 
 	$effect(() => {
@@ -68,21 +98,24 @@
 		}
 
 		clearTimeout(debounceTimer);
-		debounceTimer = window.setTimeout(async () => {
+		debounceTimer = window.setTimeout(() => {
 			loading = true;
 			try {
-				const allLinks = await getAllLinks();
+				const allLinks = allLinksCache || [];
 				const q = query.toLowerCase();
 				const queryWords = q.split(/\s+/).filter(Boolean);
 
-				const filtered = (allLinks as Result[])
+				results = allLinks
 					.filter((link) => {
 						if (!link || !link.id) return false;
 						const title = (link.title || link.meta?.title || '').toLowerCase();
 						const domain = (link.domain || link.meta?.domain || '').toLowerCase();
 						if (!title && !domain) return false;
 						const combined = `${title} ${domain}`;
-						return queryWords.some((word) => combined.includes(word)) || combined.includes(q);
+						return (
+							queryWords.some((word) => combined.includes(word)) ||
+							combined.includes(q)
+						);
 					})
 					.sort((a, b) => {
 						const aTitle = (a.title || '').toLowerCase();
@@ -91,9 +124,8 @@
 					})
 					.slice(0, 10);
 
-				results = filtered;
 				selectedIndex = 0;
-			} catch (e) {
+			} catch {
 				results = [];
 			} finally {
 				loading = false;

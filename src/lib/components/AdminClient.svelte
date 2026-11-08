@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Effect } from 'effect';
+
 	type LinkItem = {
 		id: string;
 		url?: string;
@@ -13,30 +15,39 @@
 	let deleting = $state<Record<string, boolean>>({});
 	let search = $state('');
 
-	async function fetchLinks() {
-		loading = true;
-		try {
-			const res = await fetch('/api/links');
-			if (!res.ok) throw new Error('Failed to load');
-			const data = await res.json();
-			const items = Array.isArray(data) ? data : data.items || [];
-			links = items;
-			error = null;
-		} catch (e: any) {
-			error = e.message || 'Error fetching links';
-		} finally {
-			loading = false;
-		}
-	}
+	const fetchLinks = Effect.gen(function* () {
+		const res = yield* Effect.promise(() => fetch('/api/links'));
+		if (!res.ok) throw new Error('Failed to load');
+		const data = yield* Effect.promise(() => res.json());
+		return (Array.isArray(data) ? data : data.items || []) as LinkItem[];
+	});
 
+	const runFetch = () => {
+		loading = true;
+		error = null;
+
+		const run = () => {
+			Effect.runPromise(fetchLinks).then((items) => {
+				links = items;
+				loading = false;
+			}).catch((err) => {
+				error = err instanceof Error ? err.message : 'Error fetching links';
+				loading = false;
+			});
+		};
+
+		run();
+	};
+
+	// Load on mount and whenever the refresh is triggered.
 	$effect(() => {
 		const stored =
 			typeof window !== 'undefined' ? window.localStorage.getItem('admin_auth') : null;
 		if (stored) authKey = stored;
-		fetchLinks();
+		runFetch();
 	});
 
-	async function handleDelete(id: string) {
+	const handleDelete = (id: string) => {
 		if (!window.confirm('Delete this link?')) return;
 		if (!authKey) {
 			window.alert('Enter the AUTH_KEY before deleting');
@@ -44,27 +55,35 @@
 		}
 
 		deleting = { ...deleting, [id]: true };
-		try {
-			const res = await fetch('/api/admin/link', {
-				method: 'DELETE',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${authKey}`
-				},
-				body: JSON.stringify({ id })
-			});
-			const json = await res.json();
-			if (!res.ok) {
-				window.alert(json.error || 'Delete failed');
-				return;
-			}
-			links = links ? links.filter((x) => x.id !== id) : links;
-		} catch (e: any) {
-			window.alert(e.message || 'Delete request failed');
-		} finally {
+
+		const deleteEffect = Effect.gen(function* () {
+			const res = yield* Effect.promise(() =>
+				fetch('/api/admin/link', {
+					method: 'DELETE',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: `Bearer ${authKey}`
+					},
+					body: JSON.stringify({ id })
+				})
+			);
+			const json = yield* Effect.promise(() => res.json());
+			if (!res.ok) throw new Error(json.error || 'Delete failed');
+			return json;
+		});
+
+		const run = () => {
 			deleting = { ...deleting, [id]: false };
-		}
-	}
+			Effect.runPromise(deleteEffect).then(() => {
+				links = links ? links.filter((x) => x.id !== id) : links;
+			}).catch((err) => {
+				const e = err as Error;
+				window.alert(e.message || 'Delete failed');
+			});
+		};
+
+		run();
+	};
 
 	function saveAuth() {
 		window.localStorage.setItem('admin_auth', authKey);
@@ -144,6 +163,6 @@
 	{/if}
 
 	<div class="admin-footer">
-		<button class="admin-btn" onclick={fetchLinks}>Refresh</button>
+		<button class="admin-btn" onclick={() => runFetch()}>Refresh</button>
 	</div>
 </div>

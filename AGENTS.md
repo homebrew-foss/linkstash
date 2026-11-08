@@ -44,7 +44,7 @@ Copy `.env.example` to `.env` for local dev (`vite dev`), and `.dev.vars.example
 - `PUBLIC_POSTHOG_KEY` / `PUBLIC_POSTHOG_HOST` – PostHog (client `src/lib/posthog-client.ts`
   and server `src/lib/server/posthog.ts`). `PUBLIC_`-prefixed vars must be read via
   `$env/dynamic/public` — they are NOT in `$env/dynamic/private`.
-- `VOTE_COOLDOWN_MS` – optional; upvote cooldown in ms (default 6h).
+- `VOTE_COOLDOWN_MS` – removed; upvote cooldown is fixed at 6h.
 
 ## Architecture & conventions
 

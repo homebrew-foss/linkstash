@@ -1,6 +1,5 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { getClient, initDb, sanitizeLink } from '$lib/server/db';
+import { getClient, initDb, sanitizeLink } from '#lib/server/db';
 
 // GET /api/summary: links in a date range, optionally filtered by room.
 export const GET: RequestHandler = async (event) => {
@@ -18,10 +17,10 @@ export const GET: RequestHandler = async (event) => {
 		const isValidDay = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 		if (fromParam && !isValidDay(fromParam)) {
-			return json({ error: 'Invalid from format. Use YYYY-MM-DD' }, { status: 400 });
+			return Response.json({ error: 'Invalid from format. Use YYYY-MM-DD' }, { status: 400 });
 		}
 		if (toParam && !isValidDay(toParam)) {
-			return json({ error: 'Invalid to format. Use YYYY-MM-DD' }, { status: 400 });
+			return Response.json({ error: 'Invalid to format. Use YYYY-MM-DD' }, { status: 400 });
 		}
 
 		if (fromParam || toParam) {
@@ -30,7 +29,7 @@ export const GET: RequestHandler = async (event) => {
 		} else if (dayParam) {
 			// Backward compatibility: allow single day query.
 			if (!isValidDay(dayParam)) {
-				return json({ error: 'Invalid day format. Use YYYY-MM-DD' }, { status: 400 });
+				return Response.json({ error: 'Invalid day format. Use YYYY-MM-DD' }, { status: 400 });
 			}
 			fromDay = dayParam;
 			toDay = dayParam;
@@ -41,7 +40,7 @@ export const GET: RequestHandler = async (event) => {
 				args: []
 			});
 			if (maxTsResult.rows.length === 0 || !maxTsResult.rows[0].max_ts) {
-				return json({
+				return Response.json({
 					from: null,
 					to: null,
 					room: roomParam || null,
@@ -59,7 +58,7 @@ export const GET: RequestHandler = async (event) => {
 		}
 
 		if (fromDay > toDay) {
-			return json({ error: '`from` cannot be later than `to`' }, { status: 400 });
+			return Response.json({ error: '`from` cannot be later than `to`' }, { status: 400 });
 		}
 
 
@@ -112,7 +111,7 @@ export const GET: RequestHandler = async (event) => {
 				})
 			: links;
 
-		return json({
+		return Response.json({
 			from: fromDay,
 			to: toDay,
 			room: roomParam || null,
@@ -122,6 +121,6 @@ export const GET: RequestHandler = async (event) => {
 		});
 	} catch (error) {
 		console.error('Error in summary endpoint:', error);
-		return json({ error: 'Internal server error' }, { status: 500 });
+		return Response.json({ error: 'Internal server error' }, { status: 500 });
 	}
 };
