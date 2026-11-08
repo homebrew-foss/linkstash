@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "preview": "wrangler dev",
-    "deploy": "vite build && wrangler deploy",
+    "cf:dev": "bunx wrangler dev",
+    "cf:deploy": "bunx wrangler deploy",
     "db:init": "bun run scripts/db-init.ts",
     "db:reindex": "bun run scripts/db-reindex.ts",
     "type-check": "svelte-check --tsconfig ./tsconfig.json",
@@ -32,7 +32,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.6.6",
     "svelte-check": "^4.7.8",
-    "typescript": "5",
+    "typescript": "5.9.3",
     "vite": "^8.3.6",
     "wrangler": "^4.158.0"
   },

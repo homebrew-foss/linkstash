@@ -23,7 +23,7 @@
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^26.6.6",
         "svelte-check": "^4.7.8",
-        "typescript": "5",
+        "typescript": "5.9.3",
         "vite": "^8.3.6",
         "wrangler": "^4.158.0",
       },

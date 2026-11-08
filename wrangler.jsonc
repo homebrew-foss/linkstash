@@ -2,15 +2,17 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "linkstash",
 	"compatibility_date": "2026-07-18",
-	"compatibility_flags": ["nodejs_compat"],
-
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"main": ".cloudflare/worker.js",
-
+	"build": {
+		"command": "bun run build"
+	},
 	"assets": {
 		"directory": ".cloudflare/static",
 		"binding": "ASSETS"
 	},
-
 	"observability": {
 		"logs": {
 			"enabled": true,
@@ -20,15 +22,12 @@
 			"enabled": true
 		}
 	},
-
 	"alias": {
 		"@opentelemetry/api": "./src/lib/shims/opentelemetry-api.ts"
 	},
-
 	"vars": {
 		"LAVA_URL": "https://lava-linkstash.onrender.com"
 	},
-
 	"routes": [
 		{
 			"pattern": "linkstash.hsp-ec.xyz",
